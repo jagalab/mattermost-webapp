@@ -26,6 +26,53 @@ export default class PopoverBar extends React.PureComponent {
         showPublicLink: true,
     };
 
+    createImage(options) {
+        options = options || {};
+        const img = (Image) ? new Image() : document.createElement("img");
+        if (options.src) {
+            img.src = options.src;
+        }
+        return img;
+      }
+             
+      convertToPng(imgBlob) {
+        const imageUrl = window.URL.createObjectURL(imgBlob);
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        const imageEl = this.createImage({ src: imageUrl });
+        imageEl.onload = (e) => {
+          canvas.width = e.target.width;
+          canvas.height = e.target.height;
+          ctx.drawImage(e.target, 0, 0, e.target.width, e.target.height);
+          canvas.toBlob(this.copyToClipboard, "image/png", 1);
+        };      
+      }
+      
+      async copyImg(src, link) {
+         const img = await fetch(link);
+         const imgBlob = await img.blob();
+         if (src.endsWith(".jpg") || src.endsWith(".jpeg")) {
+           this.convertToPng(imgBlob);
+         } else if (src.endsWith(".png")) {
+           this.copyToClipboard(imgBlob);
+         } else {
+           console.error("Format unsupported");
+         }
+      }
+      
+      async copyToClipboard(pngBlob) {
+          try {
+            await navigator.clipboard.write([
+              new ClipboardItem({
+                  [pngBlob.type]: pngBlob
+              })
+            ]);
+            console.log("Image copied");
+          } catch (error) {
+              console.error(error);
+          }
+      }
+
     render() {
         var publicLink = '';
         if (this.props.enablePublicLink && this.props.showPublicLink) {
@@ -48,6 +95,7 @@ export default class PopoverBar extends React.PureComponent {
         }
 
         let downloadLinks = null;
+        let copyLinks = null;
         if (this.props.canDownloadFiles) {
             let downloadLinkText;
             const downloadLinkProps = {};
@@ -69,6 +117,26 @@ export default class PopoverBar extends React.PureComponent {
                 downloadLinkProps.download = this.props.filename;
             }
 
+            let copyLinkText;
+            const copyLinkProps = {};
+            if (this.props.isExternalFile) {
+                copyLinkText = (
+                    <FormattedMessage
+                        id='view_image_popover.open'
+                        defaultMessage='Open'
+                    />
+                );
+            } else {
+                copyLinkText = (
+                    <FormattedMessage
+                        id='view_image_popover.copy'
+                        defaultMessage='Copy'
+                    />
+                );
+
+                copyLinkProps.copy = this.props.filename;
+            }
+
             downloadLinks = (
                 <div className='image-links'>
                     {publicLink}
@@ -80,6 +148,20 @@ export default class PopoverBar extends React.PureComponent {
                         {...downloadLinkProps}
                     >
                         {downloadLinkText}
+                    </a>
+                </div>
+            );
+
+            copyLinks = (
+                <div className='image-links' onClick={()=>this.copyImg(this.props.filename, this.props.fileURL)}>
+                    <a
+                        // href={this.props.fileURL}
+                        className='text'
+                        target='_blank'
+                        rel='noopener noreferrer'
+                        {...copyLinkProps}
+                    >
+                        {copyLinkText}
                     </a>
                 </div>
             );
@@ -102,6 +184,7 @@ export default class PopoverBar extends React.PureComponent {
                     />
                 </span>
                 {downloadLinks}
+                {copyLinks}
             </div>
         );
     }
